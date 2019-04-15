@@ -1,6 +1,3 @@
-# Path to a JSON file with samples and their corresponding fastq files.
-SAMPLES_JSON: "samples.json"
-
 # Path to fastq files
 READS: "reads/raw/"
 
