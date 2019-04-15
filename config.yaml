@@ -1,3 +1,6 @@
+# Path to reference fasta file
+REFERENCE: "/mnt/data/ref/hg38.fa"
+
 # Path to fastq files
 READS: "reads/raw/"
 
@@ -5,6 +8,10 @@ READS: "reads/raw/"
 TRIMMED: "reads/trimmed/"
 
 # Path to the fastq files. Remember to create it with the setup file!
-FASTQC_DIR: "reads/quality/"
+FASTQC: "reads/quality/"
 
-LOG_DIR: "logs/"
+# Path to alignment
+ALIGNMENT: "algn/"
+
+# Path to all log files
+LOGS: "logs/"
