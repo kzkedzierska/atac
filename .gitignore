@@ -1,0 +1,4 @@
+.snakemake/
+reads/
+logs/
+multiqc_*

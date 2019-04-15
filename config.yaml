@@ -1,0 +1,13 @@
+# Path to a JSON file with samples and their corresponding fastq files.
+SAMPLES_JSON: "samples.json"
+
+# Path to fastq files
+READS: "reads/raw/"
+
+# Path to the trimmed fastq files
+TRIMMED: "reads/trimmed/"
+
+# Path to the fastq files. Remember to create it with the setup file!
+FASTQC_DIR: "reads/quality/"
+
+LOG_DIR: "logs/"
