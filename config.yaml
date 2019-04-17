@@ -11,7 +11,13 @@ TRIMMED: "reads/trimmed/"
 FASTQC: "reads/quality/"
 
 # Path to alignment
-ALIGNMENT: "algn/"
+ALIGNMENT: "alignment/"
+
+# Path to alignment metrics
+ALIGNMENT_QUAL: "alignment/quality"
 
 # Path to all log files
 LOGS: "logs/"
+
+# Path to Picard 
+PICARD: "/home/kzkedzierska/miniconda3/envs/atac/share/picard-2.19.0-0/picard.jar"

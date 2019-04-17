@@ -1,5 +1,6 @@
 .snakemake/
 reads/
+alignment/
 logs/
 multiqc_*
 dag.png

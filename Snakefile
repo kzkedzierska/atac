@@ -10,7 +10,9 @@ especially for Snakemake syntax as this is my first snakemake pipeline.
 https://github.com/porchard/ATACseq-Snakemake/blob/master/src/Snakefile
 """
 
-#TODO: replace + with os.path.join!
+#TODO: 
+# automatize config.yaml creation, 
+# replace 2> with tee
 
 from glob import glob
 import re
@@ -25,52 +27,121 @@ def fastq_to_bn(fastq_bn):
 # FASTQ files
 READS = glob(config['READS'] + "/*.fastq[.gz]*") 
 #SAMPLES = list(set([os.path.basename(read_file).split("_")[0] for read_file in READS]))
-#FASTQ_BN = [fastq_to_bn(os.path.basename(fastq_file)) for fastq_file in READS]
 
-SAMPLES=['SRR5876159', 'SRR5876662']
+SAMPLES=['SRR5876159']
 
 rule all:
     input:
         # FASTQC output for RAW reads
-        expand(config['FASTQC'] + '{sample}_R{read}_fastqc.zip', 
+        expand(os.path.join(config['FASTQC'], '{sample}_R{read}_fastqc.zip'), 
                sample = SAMPLES, 
                read = ['1', '2']),
 
         # Trimming 
-        expand(config['TRIMMED'] + '{sample}_R{read}_val_{read}.fq.gz', 
+        expand(os.path.join(config['TRIMMED'],
+                            '{sample}_R{read}_val_{read}.fq.gz'), 
                sample = SAMPLES, 
                read = ['1', '2']),
+
         # Alignment 
         expand(os.path.join(config['ALIGNMENT'], '{sample}_sorted.bam'), 
                sample = SAMPLES), 
 
+        # Marking Duplicates
+        expand(os.path.join(config['ALIGNMENT'], '{sample}_sorted_md.bam'),
+               sample = SAMPLES),
+
+        # Filtering 
+        expand(os.path.join(config['ALIGNMENT'], 
+                            '{sample}_sorted_filtered.bam'),
+               sample = SAMPLES),
+        expand(os.path.join(config['ALIGNMENT'],
+                            '{sample}_sorted_filtered.bam.bai'),
+               sample = SAMPLES),
+
         # multiqc report
         "multiqc_report.html"
-
-#rule peak_calling:
-#
-#rule mark_duplicates:
-#    input:
-#    
-#    output:
-#    shell:
-#        
-#
-#rule filter:
-#    input:
-#    shell
-#
 
     message:
         '\n#################### ATAC-seq pipeline #####################\n'
         'Running all necessary rules to produce complete output.\n'
         '############################################################'
 
+#rule peak_calling:
+#
+rule filter: 
+    """Clean up alignments
+    Flags to filter out (-F):
+      read unmapped (0x4 = 4)
+      mate unmapped (0x8 = 8)
+      not primary alignment (0x100 = 256)
+      read fails platform/vendor quality checks (0x200 = 512)
+      read is PCR or optical duplicate (0x400 = 1024)
+      supplementary alignment (0x800 = 2048)
+  
+    Flags to keep (-f):
+      read paired (0x1 = 1)
+      read mapped in proper pair (0x2 = 2)
+    """
+    input:
+        bam = os.path.join(config['ALIGNMENT'], '{sample}_sorted_md.bam'),
+        index = os.path.join(config['ALIGNMENT'], '{sample}_sorted_md.bam.bai')
+    output:
+        bam = os.path.join(config['ALIGNMENT'], 
+                           '{sample}_sorted_filtered.bam'),
+        index = os.path.join(config['ALIGNMENT'],
+                             '{sample}_sorted_filtered.bam.bai')
+    threads: 8
+    message: 
+        '\n######################### Filtering ########################\n'
+        'Filtering alignment followed by indexing\n'
+        '{output.bam}\n'
+        '{output.index}\n'
+        '############################################################'
+    shell:
+        'samtools view -b -h -f 3 -F 3852 -@ {threads} {input.bam} > {output.bam};'
+        ' samtools index {output.bam}'
+
+
+rule mark_duplicates:
+    input: 
+        os.path.join(config['ALIGNMENT'], '{sample}_sorted.bam')
+    output:
+        bam = os.path.join(config['ALIGNMENT'], '{sample}_sorted_md.bam'),
+        index = os.path.join(config['ALIGNMENT'], '{sample}_sorted_md.bam.bai'),
+        flagstat_metrics = os.path.join(config['ALIGNMENT_QUAL'], 
+                                        'flagstat_{sample}.txt'),
+        md_metrics = os.path.join(config['ALIGNMENT_QUAL'], 
+                                 'DuplicationMetrics_{sample}.txt')
+    params:
+        tmp_dir = config['ALIGNMENT'],
+        picard_path = config['PICARD']
+    message: 
+        '\n##################### Marking Duplicates ###################\n'
+        'Running Picard MarkDuplicates followed by indexing\n'
+        '{output.bam}\n'
+        '{output.index}\n'
+        '############################################################'
+    log:
+        os.path.join(config['LOGS'], 'MarkDuplicates_{sample}.log'), 
+    shell:
+        'java -Xmx4g -Xms4g -jar {params.picard_path} MarkDuplicates' 
+        ' I={input} O={output.bam} ASSUME_SORTED=true'
+        ' METRICS_FILE={output.md_metrics}'
+        ' TMP_DIR={params.tmp_dir} 2> {log};'
+        ' samtools index {output.bam};'
+        ' samtools flagstat {output.bam} > {output.flagstat_metrics}' 
+
 rule alignment:
     input:
-        config['REFERENCE'],
-        os.path.join(config['TRIMMED'], '{sample}_R1_val_1.fq.gz'),
-        os.path.join(config['TRIMMED'], '{sample}_R2_val_2.fq.gz')
+        ref = config['REFERENCE'],
+        forw = os.path.join(config['TRIMMED'], '{sample}_R1_val_1.fq.gz'),
+        rev = os.path.join(config['TRIMMED'], '{sample}_R2_val_2.fq.gz'),
+        amb = config['REFERENCE'] + '.amb',
+        ann = config['REFERENCE'] + '.ann',
+        bwt = config['REFERENCE'] + '.bwt',
+        pac = config['REFERENCE'] + '.pac',
+        sa = config['REFERENCE'] + '.sa'
     output:
         os.path.join(config['ALIGNMENT'], '{sample}_sorted.bam')
     params: 
@@ -80,63 +151,100 @@ rule alignment:
     log:
         bwa = os.path.join(config['LOGS'], 'bwa_{sample}.log'), 
         samtools = os.path.join(config['LOGS'], 'samtools_sort_{sample}.log')
+    threads: 4
     message: 
         '\n######################### Mapping ##########################\n'
-        'Running bwa_mem follow by sorting on {sample}\n'
+        'Running bwa_mem follow by sorting to produce:\n'
+        '{output}\n'
         '############################################################'
     shell:
-        'bwa mem -t {threads} {input} 2> {log.bwa} |' 
+        'bwa mem -t {threads} {input.ref} {input.forw} {input.rev}'
+        ' 2> {log.bwa} |' 
         ' samtools sort -m 1g -@ {threads} -O bam -T {params.sort_tmp}'
         ' -o {output} - 2> {log.samtools}'
 
+rule build_index:
+    input:
+        config['REFERENCE']
+    output:
+        amb = config['REFERENCE'] + '.amb',
+        ann = config['REFERENCE'] + '.ann',
+        bwt = config['REFERENCE'] + '.bwt',
+        pac = config['REFERENCE'] + '.pac',
+        sa = config['REFERENCE'] + '.sa'
+    message: 
+        '\n######################### Indexing ##########################\n'
+        'BWA index not found, running bwa index command:\n'
+        'bwa index -a bwstw {input}\n'
+        '############################################################'
+    log:
+        os.path.join(config["LOGS"], 'indexing.log')
+    shell:
+        'bwa index -a bwtsw {input} 2> {log}'
+
 rule trimming:
     input:
-        forw = config['READS'] + '{sample}_R1.fastq.gz',
-        rev = config['READS'] + '{sample}_R2.fastq.gz' 
+        forw = os.path.join(config['READS'], '{sample}_R1.fastq.gz'),
+        rev = os.path.join(config['READS'], '{sample}_R2.fastq.gz') 
     output:
-        config['TRIMMED'] + '{sample}_R1_val_1.fq.gz',
-        config['TRIMMED'] + '{sample}_R2_val_2.fq.gz',
-        config['TRIMMED'] + '{sample}_R1.fastq.gz_trimming_report.txt',
-        config['TRIMMED'] + '{sample}_R2.fastq.gz_trimming_report.txt'
+        os.path.join(config['TRIMMED'], '{sample}_R1_val_1.fq.gz'),
+        os.path.join(config['TRIMMED'], '{sample}_R2_val_2.fq.gz'),
+        os.path.join(config['TRIMMED'],
+                     '{sample}_R1.fastq.gz_trimming_report.txt'),
+        os.path.join(config['TRIMMED'],
+                     '{sample}_R2.fastq.gz_trimming_report.txt')
     params:
         qc_outdir = config["FASTQC"],
         outdir = config['TRIMMED']
     log:
-        config["LOGS"] + 'trim_galore_{sample}.log' 
+        os.path.join(config["LOGS"], 'trim_galore_{sample}.log')
     message:
         '\n######################### Trimming #########################\n'
         'Running trim_galore on:\n'
         '{input.forw}\n{input.rev}\n'
         '############################################################'
     shell:
-        'trim_galore --fastqc_args "--outdir {params.qc_outdir}"'
-        ' --gzip -o {params.outdir} --paired {input.forw} {input.rev} &> {log}'
+        'trim_galore --fastqc_args "--outdir {params.qc_outdir}" --gzip'
+        ' -o {params.outdir} --paired {input.forw} {input.rev} &> {log}'
 
 rule fastqc:
     input:
-        forw = config['READS'] + '{sample}_R1.fastq.gz',
-        rev = config['READS'] + '{sample}_R2.fastq.gz' 
+        forw = os.path.join(config['READS'], '{sample}_R1.fastq.gz'),
+        rev = os.path.join(config['READS'], '{sample}_R2.fastq.gz') 
     output:
-        config['FASTQC'] + '{sample}_R1_fastqc.zip',
-        config['FASTQC'] + '{sample}_R2_fastqc.zip'
+        os.path.join(config['FASTQC'], '{sample}_R1_fastqc.zip'),
+        os.path.join(config['FASTQC'], '{sample}_R2_fastqc.zip')
     params:
         outdir = config["FASTQC"]
     log:
-        config["LOGS"] + 'fastqc_{sample}.log'
+        os.path.join(config["LOGS"], 'fastqc_{sample}.log')
     shell:
         'fastqc {input.forw} {input.rev} -o {params.outdir} &> {log}'
 
 rule multiqc:
     input:
         # FASTQC output for RAW reads
-        expand(config['FASTQC'] + '{sample}_R{read}_fastqc.zip', 
-               sample = SAMPLES, 
+        expand(os.path.join(config['FASTQC'], 
+                            '{sample}_R{read}_fastqc.zip'),
+               sample = SAMPLES,
                read = ['1', '2']),
 
         # Trimming reports
-        expand(config['TRIMMED'] + '{sample}_R{read}.fastq.gz_trimming_report.txt', 
+        expand(os.path.join(config['TRIMMED'], 
+                            '{sample}_R{read}.fastq.gz_trimming_report.txt'), 
                sample = SAMPLES,
-               read = ['1', '2'])
+               read = ['1', '2']),
+
+        # Mark Duplicates metrcis
+        expand(os.path.join(config['ALIGNMENT_QUAL'], 
+                            'DuplicationMetrics_{sample}.txt'),
+               sample = SAMPLES),
+
+        # Alignment Stats
+        expand(os.path.join(config['ALIGNMENT_QUAL'], 
+                            'flagstat_{sample}.txt'),
+               sample = SAMPLES)
+
     output:
         "multiqc_report.html"
     message:
