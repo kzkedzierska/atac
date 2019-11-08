@@ -5,3 +5,4 @@ alignment/
 logs/
 multiqc_*
 dag.png
+atac.yaml

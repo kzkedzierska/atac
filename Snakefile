@@ -13,6 +13,7 @@ https://github.com/porchard/ATACseq-Snakemake/blob/master/src/Snakefile
 #TODO: 
 # automatize config.yaml creation, 
 # replace 2> with tee
+# move everything to conda?
 
 from glob import glob
 import re
