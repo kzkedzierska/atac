@@ -20,15 +20,11 @@ import os
 
 configfile: "config.yaml"
 
-# Helper functions
-def fastq_to_bn(fastq_bn):
-    return re.sub(r".fastq[.gz]*", "", fastq_bn)
+SAMPLES=list()
 
-# FASTQ files
-READS = glob(config['READS'] + "/*.fastq[.gz]*") 
-#SAMPLES = list(set([os.path.basename(read_file).split("_")[0] for read_file in READS]))
-
-SAMPLES=['SRR5876159']
+with open(config['SAMPLES'], "r+") as fil:
+    for lin in fil.readlines():
+        SAMPLES.append(lin.strip("\n"))
 
 rule all:
     input:
@@ -59,6 +55,16 @@ rule all:
                             '{sample}_sorted_filtered.bam.bai'),
                sample = SAMPLES),
 
+        # Peak calling
+        expand(os.path.join(config['PEAKS'], '{sample}_peaks.xls'),
+               sample = SAMPLES),
+        expand(os.path.join(config['PEAKS'], '{sample}_peaks.narrowPeak'),
+               sample = SAMPLES),
+        expand(os.path.join(config['PEAKS'], '{sample}_summits.bed'),
+               sample = SAMPLES),
+        expand(os.path.join(config['PEAKS'], '{sample}_treat_pileup.bdg'),
+               sample = SAMPLES),
+
         # multiqc report
         "multiqc_report.html"
 
@@ -67,8 +73,36 @@ rule all:
         'Running all necessary rules to produce complete output.\n'
         '############################################################'
 
-#rule peak_calling:
-#
+
+rule peak_calling:
+    input:
+        os.path.join(config['ALIGNMENT'], '{sample}_sorted_filtered.bam')
+    output:
+        peaks = os.path.join(config['PEAKS'], '{sample}_peaks.xls'),
+        narrowPeak = os.path.join(config['PEAKS'], '{sample}_peaks.narrowPeak'),
+        summits = os.path.join(config['PEAKS'], '{sample}_summits.bed'),
+        pileup = os.path.join(config['PEAKS'], '{sample}_treat_pileup.bdg')
+    params:
+        qval = 0.05,
+        outdir = config['PEAKS'],
+        name = '{sample}'
+    log:
+        os.path.join(config['LOGS'], 'macs2_{sample}.log') 
+    message:
+        '\n######################### Peak calling ########################\n'
+        'Peak calling\n'
+        '{output.peaks}\n'
+        '############################################################'
+    conda:
+        config['CONDA_MACS2']
+    shell:
+        'macs2 callpeak --gsize hs --qvalue {params.qval} --format BAM '
+        '--keep-dup all --call-summits --bdg --verbose 3 '
+        '--extsize 200 --shift 100 --nomodel --nolambda '
+        '--treatment {input} --outdir {params.outdir} --name {params.name} '
+        '&> {log} ; '
+
+
 rule filter: 
     """Clean up alignments
     Flags to filter out (-F):
@@ -82,10 +116,13 @@ rule filter:
     Flags to keep (-f):
       read paired (0x1 = 1)
       read mapped in proper pair (0x2 = 2)
+
+    Also, filtering out blackilsted regions.
     """
     input:
         bam = os.path.join(config['ALIGNMENT'], '{sample}_sorted_md.bam'),
-        index = os.path.join(config['ALIGNMENT'], '{sample}_sorted_md.bam.bai')
+        index = os.path.join(config['ALIGNMENT'], '{sample}_sorted_md.bam.bai'),
+        blacklist = config['BLACKLIST'] 
     output:
         bam = os.path.join(config['ALIGNMENT'], 
                            '{sample}_sorted_filtered.bam'),
@@ -99,8 +136,9 @@ rule filter:
         '{output.index}\n'
         '############################################################'
     shell:
-        'samtools view -b -h -f 3 -F 3852 -@ {threads} {input.bam} > {output.bam};'
-        ' samtools index {output.bam}'
+        'samtools view -b -h -f 3 -F 3852 -@ {threads} {input.bam} | ' 
+        'bedtools intersect -v -abam stdin -b {input.blacklist} > {output.bam}; '
+        'samtools index {output.bam}'
 
 
 rule mark_duplicates:
@@ -204,8 +242,8 @@ rule trimming:
         '{input.forw}\n{input.rev}\n'
         '############################################################'
     shell:
-        'trim_galore --fastqc_args "--outdir {params.qc_outdir}" --gzip'
-        ' -o {params.outdir} --paired {input.forw} {input.rev} &> {log}'
+        'trim_galore --fastqc_args "--outdir {params.qc_outdir}" --gzip '
+        '-o {params.outdir} --paired {input.forw} {input.rev} &> {log}'
 
 rule fastqc:
     input:

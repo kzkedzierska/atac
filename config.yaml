@@ -1,5 +1,11 @@
 # Path to reference fasta file
-REFERENCE: "/mnt/data/ref/hg38.fa"
+REFERENCE: "/mnt/data/kzkedzierska/ref/hg38.fa"
+
+# Path to blacklisted regions
+BLACKLIST: "/mnt/data/kzkedzierska/ref/blacklisted/hg38.blacklist.bed"
+
+# Path to samples file
+SAMPLES: "samples.txt"
 
 # Path to fastq files
 READS: "reads/raw/"
@@ -16,8 +22,14 @@ ALIGNMENT: "alignment/"
 # Path to alignment metrics
 ALIGNMENT_QUAL: "alignment/quality"
 
+# Path to peaks
+PEAKS: "peaks/"
+
 # Path to all log files
 LOGS: "logs/"
 
 # Path to Picard 
 PICARD: "/home/kzkedzierska/miniconda3/envs/atac/share/picard-2.19.0-0/picard.jar"
+
+# Path to macs2 conda env
+CONDA_MACS2: "macs2.yml"

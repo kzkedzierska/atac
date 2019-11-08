@@ -1,6 +1,6 @@
 # ATAC-seq analysis pipeline
 
-This is repository for the ATAC-seq analysis pipeline. 
+ATAC-seq pipeline wrote in Snakemake. Work in progress ;)
 
 ## Prerequisites
 
@@ -13,3 +13,5 @@ I put the versions I'm using in brackets.
 * bwa (0.7.17)
 * samtools (1.7)
 * picard (2.19.0)
+* conda (4.7.5)
+* macs2 (2.1.2)

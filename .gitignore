@@ -1,5 +1,6 @@
 .snakemake/
 reads/
+peaks/
 alignment/
 logs/
 multiqc_*
