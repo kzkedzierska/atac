@@ -1,35 +1,56 @@
+# Sequencing platform
+SEQUENCING_PLATFORM: "Illumina"
+
+# Sequencing centre
+SEQUENCING_CENTRE: "Diagenode"
+
 # Path to reference fasta file
-REFERENCE: "/mnt/data/kzkedzierska/ref/hg38.fa"
+REFERENCE: "ref/hg38/hg38.fa"
 
 # Path to blacklisted regions
-BLACKLIST: "/mnt/data/kzkedzierska/ref/blacklisted/hg38.blacklist.bed"
+BLACKLIST: "ref/hg38/hg38-blacklist.v2.bed"
+# BLACKLIST: "ref/hg38.blacklist.bed"
+
+# Path to chromosome sizes
+GENOMES: "ref/hg38/hg38_sizes.genome"
 
 # Path to samples file
-SAMPLES: "samples.txt"
+SAMPLE_SHEET: "sample_sheet.tsv"
 
 # Path to fastq files
-READS: "reads/raw/"
+READS: "reads/raw"
 
 # Path to the trimmed fastq files
-TRIMMED: "reads/trimmed/"
+TRIMMED: "reads/trimmed"
 
 # Path to the fastq files. Remember to create it with the setup file!
-FASTQC: "reads/quality/"
+FASTQC: "reads/quality"
 
 # Path to alignment
-ALIGNMENT: "alignment/"
+ALIGNMENT: "alignment"
 
 # Path to alignment metrics
 ALIGNMENT_QUAL: "alignment/quality"
 
+# Path to filtered alignment
+FILTERED: "alignment/filtered"
+
 # Path to peaks
-PEAKS: "peaks/"
+MACS2: "peaks/macs2"
+HMMRATAC: "peaks/hmmratac"
 
 # Path to all log files
-LOGS: "logs/"
+LOGS: "logs"
 
-# Path to Picard 
-PICARD: "/home/kzkedzierska/miniconda3/envs/atac/share/picard-2.19.0-0/picard.jar"
+# Conda enviorenments
+## bwa, samtools, picard, bedtools
+CONDA_ALIGNMENT: "envs/alignment.yml"
 
-# Path to macs2 conda env
-CONDA_MACS2: "macs2.yml"
+## environment with trim_galore, fastqc and multiqc
+CONDA_QUALITY: "envs/quality_check.yml"
+
+## macs2 conda env
+CONDA_MACS2: "envs/macs2.yml"
+
+## hmmratac conda env
+CONDA_HMMRATAC: "envs/hmmratac.yml"

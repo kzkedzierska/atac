@@ -1,0 +1,8 @@
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - bwa=0.7.17
+  - samtools=1.16.1
+  - picard=2.27.5
+  - bedtools=2.30.0
